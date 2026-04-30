@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Meade Social Jr</title>
+<style>
+:root{--radius:20px;--shadow:0 10px 26px rgba(0,0,0,.12)}
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#eef2f6}
+.container{max-width:1200px;margin:auto;padding:24px}
+.hidden{display:none}
+header{display:flex;align-items:center;gap:16px}
+header h1{flex:1}
+.layout{display:grid;grid-template-columns:1fr 330px;gap:24px;margin-top:20px}
+.panel{background:white;border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.notice-header{background:#0b4fe2;color:white;padding:18px;font-weight:700;font-size:1.25rem}
+.notice-card{padding:22px;line-height:1.6}
+.section{margin-top:20px;padding:18px;border-radius:14px;background:#f8fafc;border:1px solid #e5e7eb}
+.edit-box{padding:22px;border-top:1px solid #e5e7eb;background:#f9fafb}
+textarea{width:100%;min-height:120px;resize:vertical}
+input,select,textarea{padding:12px;border-radius:12px;border:1px solid #cbd5e1;margin-top:10px;font-size:1rem}
+.side{display:grid;gap:16px}
+.btn{padding:20px;border-radius:26px;color:white;font-weight:700;cursor:pointer;font-size:1.05rem;opacity:.95}
+.btn.active{outline:3px solid rgba(255,255,255,.9);opacity:1}
+.home{background:#0b4fe2}.gallery{background:#2c9c90}.newsletter{background:#4b50e0}.sport{background:#f26f1d}.moments{background:#d6372a}.achievements{background:#8b3fe0}.leaderboard{background:#2f9966}.links{background:#1f68e3}.operator{background:#111827}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.img-wrap{position:relative}
+.gallery-grid img{width:100%;border-radius:12px}
+.delete-img{position:absolute;top:6px;right:6px;background:#ef4444;color:white;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-weight:700}
+button{padding:10px 18px;border:none;border-radius:12px;font-weight:600;cursor:pointer}
+footer{text-align:center;margin-top:30px;color:#64748b}
+.small{color:#64748b;font-size:12px}
+</style>
+</head>
+<body>
+<div class="container" id="loginBox">
+<h2>Sign In</h2>
+<input id="nameInput" placeholder="Name">
+<input id="emailInput" placeholder="Email">
+<br><br>
+<button onclick="signIn()">Sign In</button>
+<p class="small">Anyone can sign in. Operators manage content.</p>
+</div>
+<div class="container hidden" id="appBox">
+<header><h1>Meade Social Jr</h1><button onclick="logout()">Log out</button></header>
+<div class="layout">
+<div id="content" class="panel"></div>
+<div class="side" id="menu"></div>
+</div>
+<footer>© Meade Social Jr</footer>
+</div>
+<script>
+// ===== CONFIG =====
+const SUPER_OPERATOR='cardebm@students.hale.wa.edu.au';
+const OPERATORS_KEY='meade_operators';
+const USERS_KEY='meade_users';
+let currentUser=null;
+
+function isOperator(){
+  if(!currentUser) return false;
+  if(currentUser.email===SUPER_OPERATOR) return true;
+  const ops=JSON.parse(localStorage.getItem(OPERATORS_KEY)||'[]');
+  return ops.includes(currentUser.email);
+}
+
+function signIn(){
+ const n=nameInput.value.trim(); const e=emailInput.value.trim();
+ if(!n||!e) return alert('Fill in all fields');
+ currentUser={name:n,email:e}; localStorage.meadeUser=JSON.stringify(currentUser);
+ const users=JSON.parse(localStorage.getItem(USERS_KEY)||'[]');
+ if(!users.find(u=>u.email===e)){
+   users.push({name:n,email:e});
+   localStorage.setItem(USERS_KEY,JSON.stringify(users));
+ }
+ showApp();
+}
+
+function logout(){ localStorage.clear(); location.reload(); }
+function showApp(){ loginBox.classList.add('hidden'); appBox.classList.remove('hidden'); buildMenu(); openHome(); }
+function setActive(el){ document.querySelectorAll('.btn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); }
+
+function buildMenu(){
+ menu.innerHTML='';
+ const add=(cls,txt,fn)=>{ const d=document.createElement('div'); d.className='btn '+cls; d.textContent=txt; d.onclick=()=>{setActive(d);fn();}; menu.appendChild(d); };
+ add('home','Home',openHome);
+ add('gallery','Gallery',openGallery);
+ add('newsletter','Newsletter',()=>openEditable('Newsletter','newsletter'));
+ add('sport','House Sport',openSport);
+ add('moments','Moments',()=>openEditable('Moments','moments'));
+ add('achievements','Achievements',()=>openEditable('Achievements','achievements'));
+ add('leaderboard','Leaderboard',()=>openEditable('Leaderboard','leaderboard'));
+ add('links','Useful Links',openLinks);
+ if(isOperator()) add('operator','Operator Panel',openOperator);
+}
+
+// ===== HOME =====
+function openHome(){
+ const notice=localStorage.notice||'No notices yet.';
+ const visits=Number(localStorage.visits||0)+1; localStorage.visits=visits;
+ content.innerHTML=`<div class='notice-header'>Notice Board</div><div class='notice-card'>${notice}<div class='section'><b>Quick Stats</b><br>Total visits (device): ${visits}</div><div class='section'><b>Today</b><br>${new Date().toDateString()}</div></div>${isOperator()?`<div class='edit-box'><textarea onchange="save('notice',this.value)">${notice}</textarea></div>`:''}`;
+}
+
+function openEditable(title,key){ const d=localStorage[key]||'Nothing added yet.';
+ content.innerHTML=`<div class='notice-header'>${title}</div><div class='notice-card'>${d}<div class='section small'>Last updated on this device</div></div>${isOperator()?`<div class='edit-box'><textarea onchange="save('${key}',this.value)">${d}</textarea></div>`:''}`; }
+
+function save(k,v){ syncSet(k,v); }
+
+// ===== GALLERY =====
+function openGallery(){ const g=JSON.parse(localStorage.gallery||'[]');
+ content.innerHTML=`<div class='notice-header'>Gallery</div><div class='notice-card'><input placeholder='Search images (by index)' oninput='filterImages(this.value)'><div id='galleryArea' class='gallery-grid'>${g.map(i=>`<div class='img-wrap'><img src='${i}'></div>`).join('')}</div><div class='section small'>Total images: ${g.length}</div></div>${isOperator()?`<div class='edit-box'><input type='file' accept='image/*' onchange='addImage(this)'></div>`:''}`; }
+function filterImages(v){ const g=JSON.parse(localStorage.gallery||'[]'); const a=document.getElementById('galleryArea'); a.innerHTML=g.map((i,idx)=>String(idx).includes(v)?`<div class='img-wrap'><img src='${i}'></div>`:'').join(''); }
+function addImage(i){ const r=new FileReader(); r.onload=()=>{ const g=JSON.parse(localStorage.gallery||'[]'); g.push(r.result); syncSet('gallery',g); openGallery(); }; r.readAsDataURL(i.files[0]); }
+
+// ===== SPORT =====
+function openSport(){ const a=localStorage.sport||'Athletics'; const history=JSON.parse(localStorage.sportHistory||'[]'); content.innerHTML=`<div class='notice-header'>House Sport</div><div class='notice-card'><b>Approved sport:</b> ${a}<br><br><select onchange='requestSport(this.value)'><option disabled selected>Request change</option><option>Athletics</option><option>Swimming</option><option>Cross Country</option><option>Football</option></select><div class='section'><b>Change history</b><br>${history.map(h=>`• ${h}`).join('<br>')||'None yet'}</div></div>`; }
+function requestSport(v){ localStorage.pendingSport=v; alert('Request sent to operators'); }
+
+// ===== LINKS =====
+function openLinks(){ const d=localStorage.links||'Add useful links here.'; content.innerHTML=`<div class='notice-header'>Useful Links</div><div class='notice-card'>${d}<div class='section'><b>Quick Add</b><br><input placeholder='Paste link' onkeydown='addLink(event,this)'></div></div>${isOperator()?`<div class='edit-box'><textarea onchange="save('links',this.value)">${d}</textarea></div>`:''}`; }
+function addLink(e,i){ if(e.key==='Enter'){ save('links',(localStorage.links||'')+'<br>'+i.value); i.value=''; openLinks(); }}
+
+// ===== OPERATOR (EXTENDED ONLY) =====
+function openOperator(){
+ const users=JSON.parse(localStorage.getItem(USERS_KEY)||'[]');
+ const ops=JSON.parse(localStorage.getItem(OPERATORS_KEY)||'[]');
+ content.innerHTML=`<div class='notice-header'>Operator Panel</div><div class='notice-card'>Pending sport: ${localStorage.pendingSport||'None'}<br>${localStorage.pendingSport?`<button onclick='approveSport()'>Approve</button>`:''}<div class='section'><b>Operator management</b><br><br>${users.map(u=>{const isOp=u.email===SUPER_OPERATOR||ops.includes(u.email);const can=u.email!==SUPER_OPERATOR&&u.email!==currentUser.email;return `<div style='margin-bottom:10px'><b>${u.name}</b> (${u.email})<br>Status: <b>${isOp?'Operator ✅':'User'}</b><br>${can?`<button onclick="toggleOperator('${u.email}')">${isOp?'Remove operator':'Make operator'}</button>`:'<span class="small">Cannot change</span>'}</div>`}).join('')}</div></div>`;
+}
+
+function toggleOperator(email){ let ops=JSON.parse(localStorage.getItem(OPERATORS_KEY)||'[]'); if(ops.includes(email)) ops=ops.filter(e=>e!==email); else ops.push(email); localStorage.setItem(OPERATORS_KEY,JSON.stringify(ops)); openOperator(); }
+
+function approveSport(){ const h=JSON.parse(localStorage.sportHistory||'[]'); h.push(localStorage.pendingSport);
+ localStorage.sportHistory=JSON.stringify(h); localStorage.sport=localStorage.pendingSport; localStorage.pendingSport=null; alert('Sport approved'); openOperator(); }
+
+const saved=localStorage.getItem('meadeUser'); if(saved){ currentUser=JSON.parse(saved); showApp(); }
+</script>
+
+<!-- Firebase Realtime Database -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+// ===== REALTIME DB CONFIG (REPLACE WITH YOUR OWN) =====
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+  projectId: "YOUR_PROJECT",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// Mirror localStorage <-> realtime db
+const SYNC_KEYS = [
+ 'notice','gallery','sport','sportHistory','links','meade_operators','meade_users','pendingSport'
+];
+
+SYNC_KEYS.forEach(key => {
+  // pull remote changes
+  db.ref(key).on('value', snap => {
+    const val = snap.val();
+    if(val !== null) localStorage[key] = typeof val === 'string' ? val : JSON.stringify(val);
+  });
+});
+
+function syncSet(key, value){
+  localStorage[key] = typeof value === 'string' ? value : JSON.stringify(value);
+  db.ref(key).set(value);
+}
+</script>
+
+</body>
+</html>
